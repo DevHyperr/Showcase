@@ -69,6 +69,7 @@ local function GetDistanceBetween(a: Vector3 | BasePart, b: Vector3 | BasePart, 
 	end
 end
 
+-- Returns whether all specified parameters match the first.
 local function match(value1, ...)
 	local values = {...}
 	for _, i in pairs(values) do
@@ -117,33 +118,40 @@ type Entity = {
 local Entity = {} :: Entity
 Entity.__index  = Entity
 
+-- Returns an Entity's Emoji for prettier Debugging!
 function Entity:Emoji()
-	return Entity:GetData('Emoji')
+	return Entity:GetData('Emoji') or ""
 end
 
--- Returns the value of a specified key from the Entity's data.
-function Entity:GetData(key: string): any
+--[[
+Returns the value of a specified key from the Entity's data.
+If the specified key couldn't be read, the function returns nil.
+]]
+function Entity:GetData(key: string): any?
 	if DataModule[self.Class] then
 		if DataModule[self.Class][self.Id] then
 			if DataModule[self.Class][self.Id][key] then
 				return DataModule[self.Class][self.Id][key]
 			else
 				warn(self.Class, self.Id, key)
+				return nil
 			end
 		else
 			warn(self.Class, self.Id, key)
+			return nil
 		end
 	else
 		warn(self.Class, self.Id, key)
+		return nil
 	end
 end
 
--- Returns the HumanoidRootPart or PrimaryPart of the Entity.
+-- Returns the Entity's HumanoidRootPart or PrimaryPart of the Entity.
 function Entity:GetRoot(): BodyPart
 	return self.Body:FindFirstChild("HumanoidRootPart") or self.Body.PrimaryPart
 end
 
--- Returns the nearest target and the distance to it.
+-- Returns the Entity's nearest target and the distance in studs between them.
 function Entity:FindTargets(): (Entity?, number?)
 	
 	local function findTargetsFrom(folder)
@@ -165,8 +173,8 @@ function Entity:FindTargets(): (Entity?, number?)
 		end)
 		return nearestTargets
 	end
+			
 	if self.Class == "Invader" then
-		
 		local AllyTargets = findTargetsFrom(Allies)
 		local StructureTargets = findTargetsFrom(Structures)
 		
@@ -188,8 +196,6 @@ function Entity:FindTargets(): (Entity?, number?)
 		return findTargetsFrom(Invaders)
 	end
 end
-
-
 
 -- Checks every single individual component of the Entity.
 function Entity:Debug()
@@ -297,6 +303,7 @@ function Entity:Face(location: Vector3 | BasePart, fade: boolean?)
 	end
 end
 
+-- This function makes the Entity walk to the nearest free position.
 function Entity:Spread()
 	if #self.Targets > 0 then return end
 
@@ -323,8 +330,6 @@ function Entity:Spread()
 				local offset = myAnchor.Position - anchor.Position
 				offset = Vector3.new(offset.X,  self.anchorY, offset.Z) 
 				local dist = offset.Magnitude
-
-				-- ✅ Ignore zero-distance (avoids NaN)
 				local minDistance = 1.7
 				if dist > 0.01 and dist < (minDistance) then
 					repel += Vector3.new(offset.X,  self.anchorY, offset.Z).Unit * (2 - dist)
@@ -342,13 +347,11 @@ function Entity:Spread()
 	local moveDir = repel / count
 	local targetPos = myAnchor.Position + moveDir
 
-	-- ✅ Lock Y to prevent float/sink bugs
 	targetPos = Vector3.new(targetPos.X, self.anchorY, targetPos.Z)
 	if myAnchor.Position.Y < -1 then
 		warn(myAnchor.Position.Y)
 	end
 	
-	-- ✅ Final sanity check
 	local function isValidVector3(v)
 		return v.Magnitude == v.Magnitude and v.Magnitude < 1000
 	end
@@ -362,10 +365,9 @@ function Entity:Spread()
 	end
 end
 
--- Rounds a number to 2 decimal places.
-local function float2(num: number, decimals: number?)
+-- Rounds a specified number to 2 decimal places.
+local function float2(num: number)
 	return math.round(num * 100) / 100
-	
 end
 
 -- Moves the Entity's anchor smoothly to a specified location, Entity or BasePart relative to the its WalkSpeed.
@@ -508,9 +510,6 @@ function Entity:Attack(attack)
 				end
 			end
 		end
-
-		
-		
 		task.wait(General.Duration)
 		self.Attacking = false
 		General.LastTimeAttacked = tick()
@@ -519,7 +518,7 @@ function Entity:Attack(attack)
 	end
 end
 
--- Takes a specified amount of damage.
+-- Makes the Entity take a specified amount of damage.
 function Entity:TakeDamage(who: Entity, amount: number, damageType: string)
 	if DebugConfig.Entity.Log_Damage then
 		print(`Entity {self.UID} has taken {amount} damage.`)
@@ -658,6 +657,7 @@ function Entity:CancelActiveTweens()
 	end
 end
 
+-- Stops all running animations on an entity.
 function Entity:StopAnimation(name: string)
 	if self.CurrentAnimName == name then
 		self:Animate()
@@ -845,12 +845,12 @@ function Entity:Die(cause: string?)
 	
 end
 
--- Returns if the Entity is alive or not.
+-- Returns whether the Entity is alive or not.
 function Entity:IsAlive(): boolean
 	return self.Health > 0
 end
 
--- Creates a new Entity object.
+-- Creates a new Entity object from the provided class, id, cFrame and player.
 function Entity.new(class: string, id: string, cFrame: CFrame, player: Player): Entity
 
 	if not(class and id and cFrame) then
@@ -924,7 +924,6 @@ function Entity.new(class: string, id: string, cFrame: CFrame, player: Player): 
 	anchorPart.Name = self.UID
 	self.anchorY = self:GetAnchor().Position.Y
 	
-
 	if DebugConfig["Entity"]["Show_Anchor"] then
 		anchorPart.Transparency = 0
 	else
@@ -939,13 +938,9 @@ function Entity.new(class: string, id: string, cFrame: CFrame, player: Player): 
 	anchorPart.Anchored = true
 	anchorPart.Rotation = Vector3.new(0,0,0)
 	anchorPart.Massless = true
-	
-	
-	
-	
+
 	body:PivotTo(anchorPart.CFrame)
 	anchorPart:SetAttribute('UID', self.UID)
-	
 	
 	local MovementEvent = anchorPart:GetPropertyChangedSignal('CFrame'):Connect(function()
 		local Position = anchorPart.Position
